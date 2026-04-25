@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum HealthStatus {
+  HEALTHY
+  OKAY
+  CRITICAL
+}
+
+model SessionContext {
+  id               String            @id @default(uuid())
+  sessionTokenHash String            @unique
+  createdAt        DateTime          @default(now())
+  lastSeenAt       DateTime          @updatedAt
+  assessments      HealthAssessment[]
+}
+
+model HealthAssessment {
+  id                    String         @id @default(uuid())
+  sessionContextId      String
+  passwordCount         Int
+  oldestPasswordAgeDays Int
+  score                 Int
+  status                HealthStatus
+  agentModel            String         @default("gpt-4o-mini")
+  createdAt             DateTime       @default(now())
+  sessionContext        SessionContext @relation(fields: [sessionContextId], references: [id], onDelete: Cascade)
+  guidanceItems         GuidanceItem[]
+
+  @@index([sessionContextId, createdAt])
+}
+
+model GuidanceItem {
+  id           String           @id @default(uuid())
+  assessmentId String
+  priorityRank Int
+  title        String
+  detail       String
+  assessment   HealthAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, priorityRank])
+}
