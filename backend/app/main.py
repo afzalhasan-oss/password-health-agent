@@ -19,19 +19,31 @@ app = FastAPI(title="Password Health Checker API", version="0.1.0")
 
 def _allowed_origins() -> list[str]:
     """Builds CORS allow-list from environment with safe local default."""
-
     origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     return [origin]
 
 
-# Configures CORS for frontend calls that include session cookies.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def _configure_cors(app: FastAPI) -> None:
+    """Configures CORS middleware for frontend calls with session cookies.
+    
+    When credentials (cookies) are included, wildcards (*) are not allowed for
+    origins, methods, or headers. All must be explicitly listed.
+    
+    The middleware must be added before other middleware to intercept OPTIONS preflight requests.
+    """
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins(),
+        allow_credentials=True,  # Required for session cookies (Set-Cookie headers)
+        allow_methods=["GET", "POST", "OPTIONS"],  # Explicit methods (no wildcard with credentials)
+        allow_headers=["Content-Type", "Authorization"],  # Explicit headers
+        expose_headers=["Content-Type"],  # Headers accessible to frontend JavaScript
+        max_age=600,  # Cache preflight response for 10 minutes
+    )
+
+
+# Add CORS middleware FIRST (before other middleware and routes)
+_configure_cors(app)
 
 install_error_handlers(app)
 app.include_router(health_checks_router)
